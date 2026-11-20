@@ -1,0 +1,130 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NewsPulse | News Analytics Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #0b1120;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 25px;
+        }
+
+        .container {
+            max-width: 750px;
+        }
+
+        .icon {
+            font-size: 65px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        h1 span {
+            color: #38bdf8;
+        }
+
+        p {
+            color: #b8c4d8;
+            font-size: 17px;
+            line-height: 1.8;
+            margin-bottom: 30px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 15px 28px;
+            background: #0ea5e9;
+            color: white;
+            text-decoration: none;
+            border-radius: 9px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .button:hover {
+            background: #0284c7;
+            transform: translateY(-3px);
+        }
+
+        .github {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 15px 28px;
+            border: 1px solid #64748b;
+            color: white;
+            text-decoration: none;
+            border-radius: 9px;
+        }
+
+        .features {
+            margin-top: 45px;
+            color: #cbd5e1;
+            line-height: 2;
+        }
+
+        footer {
+            margin-top: 45px;
+            color: #64748b;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <div class="icon">📰</div>
+
+        <h1>News<span>Pulse</span></h1>
+
+        <p>
+            News Headline Scraper & Analytics Dashboard.
+            Collect, categorize and explore news headlines
+            from multiple RSS feeds through an interactive
+            analytics platform.
+        </p>
+
+        <a class="button"
+           href="https://news-scraper-ddalyncnkpu4ccbdk73493.streamlit.app/"
+           target="_blank">
+            Explore Live Dashboard →
+        </a>
+
+        <a class="github"
+           href="https://github.com/siddhesh12345-sys/news-scraper"
+           target="_blank">
+            GitHub Repository
+        </a>
+
+        <div class="features">
+            Python • BeautifulSoup • Requests • Pandas • Streamlit
+            <br>
+            RSS News Collection • Analytics • CSV Export
+        </div>
+
+        <footer>
+            Developed by Siddhesh Bane
+        </footer>
+
+    </div>
+</body>
+</html>
