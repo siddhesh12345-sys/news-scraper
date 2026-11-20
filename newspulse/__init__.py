@@ -1,0 +1,1 @@
+"""NewsPulse news scraping package."""

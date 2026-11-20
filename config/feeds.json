@@ -1,0 +1,20 @@
+{
+  "feeds": [
+    {
+      "name": "BBC News",
+      "url": "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+    },
+    {
+      "name": "The Guardian",
+      "url": "https://www.theguardian.com/film/rss"
+    },
+    {
+      "name": "Variety",
+      "url": "https://variety.com/feed/"
+    },
+    {
+      "name": "TechCrunch",
+      "url": "https://techcrunch.com/feed/"
+    }
+  ]
+}
