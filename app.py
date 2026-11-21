@@ -1,6 +1,5 @@
 
 from pathlib import Path
-import csv
 import html
 import pandas as pd
 import streamlit as st
@@ -218,114 +217,31 @@ st.divider()
 
 
 # ==================================================
-# CSV DIAGNOSTICS
+# SOURCE NAME NORMALIZATION
 # ==================================================
 
-def inspect_csv():
+def normalize_source(source):
 
-    if not CSV_PATH.exists():
+    source = str(source).strip()
 
-        return {
-            "exists": False,
-            "total_rows": 0,
-            "invalid_rows": [],
-            "error": None
-        }
+    if not source:
+        return "Unknown"
 
-    if CSV_PATH.stat().st_size == 0:
+    source_lower = source.casefold()
 
-        return {
-            "exists": True,
-            "total_rows": 0,
-            "invalid_rows": [],
-            "error": None
-        }
+    if "bbc" in source_lower:
+        return "BBC"
 
-    total_rows = 0
-    invalid_rows = []
+    if "guardian" in source_lower:
+        return "The Guardian"
 
-    try:
+    if "techcrunch" in source_lower:
+        return "TechCrunch"
 
-        with CSV_PATH.open(
-            "r",
-            newline="",
-            encoding="utf-8-sig"
-        ) as file:
+    if "variety" in source_lower:
+        return "Variety"
 
-            reader = csv.reader(file, strict=True)
-
-            header = next(reader, None)
-
-            if header != EXPECTED_COLUMNS:
-
-                return {
-                    "exists": True,
-                    "total_rows": 0,
-                    "invalid_rows": [],
-                    "error": f"Unexpected CSV header: {header}"
-                }
-
-            total_rows = 1
-
-            for row_number, row in enumerate(reader, start=2):
-
-                total_rows += 1
-
-                if len(row) != len(EXPECTED_COLUMNS):
-
-                    invalid_rows.append({
-                        "row": row_number,
-                        "columns": len(row)
-                    })
-
-        return {
-            "exists": True,
-            "total_rows": total_rows,
-            "invalid_rows": invalid_rows,
-            "error": None
-        }
-
-    except (csv.Error, UnicodeDecodeError, OSError) as error:
-
-        return {
-            "exists": True,
-            "total_rows": total_rows,
-            "invalid_rows": invalid_rows,
-            "error": str(error)
-        }
-
-
-# Temporary diagnostics visible on dashboard.
-
-with st.expander("🔧 CSV Backend Diagnostics"):
-
-    diagnostics = inspect_csv()
-
-    st.write("CSV FILE PATH:", str(CSV_PATH))
-    st.write("CSV FILE EXISTS:", diagnostics["exists"])
-
-    if CSV_PATH.exists():
-
-        st.write(
-            "CSV FILE SIZE:",
-            CSV_PATH.stat().st_size,
-            "bytes"
-        )
-
-    st.write("TOTAL CSV ROWS:", diagnostics["total_rows"])
-    st.write("INVALID ROWS:", diagnostics["invalid_rows"])
-
-    if diagnostics["error"]:
-
-        st.error(diagnostics["error"])
-
-    elif diagnostics["invalid_rows"]:
-
-        st.warning("Malformed CSV records detected.")
-
-    else:
-
-        st.success("CSV structure validation completed.")
+    return source
 
 
 # ==================================================
@@ -338,7 +254,6 @@ def load_data(path, modified):
     file_path = Path(path)
 
     if not file_path.exists() or file_path.stat().st_size == 0:
-
         return pd.DataFrame(columns=EXPECTED_COLUMNS)
 
     try:
@@ -359,32 +274,29 @@ def load_data(path, modified):
         OSError
     ) as error:
 
-        st.error(
-            f"Unable to read news.csv: {error}"
-        )
+        st.error(f"Unable to read news.csv: {error}")
 
         return pd.DataFrame(columns=EXPECTED_COLUMNS)
 
-    # Remove unnamed columns.
+    # Remove unnamed columns
 
     data = data.loc[
         :,
         ~data.columns.astype(str).str.startswith("Unnamed")
     ]
 
-    # Add missing columns.
+    # Add missing columns
 
     for column in EXPECTED_COLUMNS:
 
         if column not in data.columns:
-
             data[column] = ""
 
-    # Keep expected columns only.
+    # Keep expected columns only
 
     data = data[EXPECTED_COLUMNS].copy()
 
-    # Clean data.
+    # Clean data
 
     for column in EXPECTED_COLUMNS:
 
@@ -395,13 +307,17 @@ def load_data(path, modified):
             .str.strip()
         )
 
-    # Remove empty headlines.
+    # Normalize source names
+
+    data["source"] = data["source"].apply(normalize_source)
+
+    # Remove empty headlines
 
     data = data[
         data["headline"].str.strip() != ""
     ]
 
-    # Remove duplicates.
+    # Remove duplicate articles
 
     data = data.drop_duplicates(
         subset=["link", "headline"],
@@ -455,7 +371,6 @@ if st.button(
             with st.expander("View Feed Warnings"):
 
                 for error in result["errors"]:
-
                     st.warning(error)
 
         st.rerun()
@@ -545,7 +460,7 @@ with right:
     categories = [
         "All"
     ] + sorted(
-        df["category"].dropna().unique().tolist()
+        df["category"].unique().tolist()
     )
 
     selected_category = st.selectbox(
@@ -553,10 +468,13 @@ with right:
         categories
     )
 
+
+# SOURCE FILTER
+
 sources = [
     "All"
 ] + sorted(
-    df["source"].dropna().unique().tolist()
+    df["source"].unique().tolist()
 )
 
 selected_source = st.selectbox(
@@ -608,7 +526,8 @@ st.subheader(
 if filtered.empty:
 
     st.warning(
-        "No headlines match your selected filters."
+        "No headlines match your selected filters. "
+        "Select All in the filters or fetch the latest news."
     )
 
 else:
