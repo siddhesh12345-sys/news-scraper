@@ -17,6 +17,14 @@ CSV_PATH = DATA_DIR / "news.csv"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+EXPECTED_COLUMNS = [
+    "headline",
+    "published",
+    "source",
+    "link",
+    "category"
+]
+
 st.set_page_config(
     page_title="NewsPulse | News Intelligence",
     page_icon="📰",
@@ -209,7 +217,7 @@ st.divider()
 
 
 # ==================================================
-# LOAD DATA
+# LOAD DATA - IMPROVED CSV HANDLING
 # ==================================================
 
 @st.cache_data
@@ -217,24 +225,80 @@ def load_data(path, modified):
 
     file_path = Path(path)
 
-    columns = [
-        "headline",
-        "published",
-        "source",
-        "link",
-        "category"
+    if not file_path.exists() or file_path.stat().st_size == 0:
+        return pd.DataFrame(columns=EXPECTED_COLUMNS)
+
+    data = None
+    last_error = None
+
+    # Try supported encodings and CSV parsing methods.
+    for encoding in ["utf-8-sig", "utf-8", "latin-1"]:
+
+        try:
+
+            data = pd.read_csv(
+                file_path,
+                encoding=encoding,
+                on_bad_lines="warn",
+                skipinitialspace=True
+            )
+
+            break
+
+        except (
+            pd.errors.ParserError,
+            UnicodeDecodeError,
+            pd.errors.EmptyDataError
+        ) as error:
+
+            last_error = error
+
+            # Try another encoding if reading fails.
+            continue
+
+    if data is None:
+
+        st.error(
+            f"Unable to read news.csv: {last_error}"
+        )
+
+        return pd.DataFrame(columns=EXPECTED_COLUMNS)
+
+    # Remove unnamed or unnecessary CSV columns.
+    data = data.loc[
+        :,
+        ~data.columns.astype(str).str.startswith("Unnamed")
     ]
 
-    if not file_path.exists() or file_path.stat().st_size == 0:
-        return pd.DataFrame(columns=columns)
+    # Add missing expected columns.
+    for column in EXPECTED_COLUMNS:
 
-    data = pd.read_csv(file_path).fillna("")
-
-    for column in columns:
         if column not in data.columns:
             data[column] = ""
 
-    return data[columns]
+    # Keep only expected columns.
+    data = data[EXPECTED_COLUMNS].copy()
+
+    # Handle missing values.
+    data = data.fillna("")
+
+    # Convert columns to strings.
+    for column in EXPECTED_COLUMNS:
+
+        data[column] = data[column].astype(str).str.strip()
+
+    # Remove completely empty headlines.
+    data = data[
+        data["headline"].str.strip() != ""
+    ]
+
+    # Remove duplicate headlines and links.
+    data = data.drop_duplicates(
+        subset=["link", "headline"],
+        keep="last"
+    )
+
+    return data.reset_index(drop=True)
 
 
 # ==================================================
@@ -246,6 +310,7 @@ def save_scrape():
     scraper = NewsScraper()
 
     with st.spinner("Fetching latest news headlines..."):
+
         result = scraper.run()
 
     st.cache_data.clear()
@@ -285,6 +350,7 @@ if st.button(
         st.rerun()
 
     except Exception as error:
+
         st.error(f"Scraping failed: {error}")
 
 
@@ -292,7 +358,11 @@ if st.button(
 # READ CSV
 # ==================================================
 
-modified = CSV_PATH.stat().st_mtime if CSV_PATH.exists() else 0
+modified = (
+    CSV_PATH.stat().st_mtime_ns
+    if CSV_PATH.exists()
+    else 0
+)
 
 df = load_data(str(CSV_PATH), modified)
 
@@ -316,11 +386,15 @@ if df.empty:
 # ==================================================
 
 st.divider()
+
 st.subheader("📊 Dashboard Overview")
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Headlines", len(df))
+col1.metric(
+    "Total Headlines",
+    len(df)
+)
 
 col2.metric(
     "OTT Platform",
@@ -357,7 +431,9 @@ with left:
 
 with right:
 
-    categories = ["All"] + sorted(
+    categories = [
+        "All"
+    ] + sorted(
         df["category"].dropna().unique().tolist()
     )
 
@@ -366,7 +442,9 @@ with right:
         categories
     )
 
-sources = ["All"] + sorted(
+sources = [
+    "All"
+] + sorted(
     df["source"].dropna().unique().tolist()
 )
 
@@ -412,11 +490,15 @@ if selected_source != "All":
 
 st.divider()
 
-st.subheader(f"📰 Latest Headlines ({len(filtered)})")
+st.subheader(
+    f"📰 Latest Headlines ({len(filtered)})"
+)
 
 if filtered.empty:
 
-    st.warning("No headlines match your selected filters.")
+    st.warning(
+        "No headlines match your selected filters."
+    )
 
 else:
 
@@ -438,11 +520,16 @@ else:
             str(item.get("category", "Other"))
         )
 
-        link = str(item.get("link", "")).strip()
+        link = str(
+            item.get("link", "")
+        ).strip()
 
         if link.startswith(("https://", "http://")):
 
-            safe_link = html.escape(link, quote=True)
+            safe_link = html.escape(
+                link,
+                quote=True
+            )
 
             title_html = (
                 f'<a href="{safe_link}" target="_blank" '
@@ -471,13 +558,17 @@ else:
 # ==================================================
 
 st.divider()
+
 st.subheader("📈 News Analytics")
 
 counts = df["category"].value_counts()
 
 if not counts.empty:
+
     st.bar_chart(counts)
+
 else:
+
     st.info("No analytics data available.")
 
 
@@ -486,6 +577,7 @@ else:
 # ==================================================
 
 st.divider()
+
 st.subheader("📥 Download News Data")
 
 download_col1, download_col2 = st.columns(2)
