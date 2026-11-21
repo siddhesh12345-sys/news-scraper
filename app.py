@@ -1,5 +1,6 @@
 
 from pathlib import Path
+import csv
 import html
 import pandas as pd
 import streamlit as st
@@ -217,7 +218,118 @@ st.divider()
 
 
 # ==================================================
-# LOAD DATA - IMPROVED CSV HANDLING
+# CSV DIAGNOSTICS
+# ==================================================
+
+def inspect_csv():
+
+    if not CSV_PATH.exists():
+
+        return {
+            "exists": False,
+            "total_rows": 0,
+            "invalid_rows": [],
+            "error": None
+        }
+
+    if CSV_PATH.stat().st_size == 0:
+
+        return {
+            "exists": True,
+            "total_rows": 0,
+            "invalid_rows": [],
+            "error": None
+        }
+
+    total_rows = 0
+    invalid_rows = []
+
+    try:
+
+        with CSV_PATH.open(
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as file:
+
+            reader = csv.reader(file, strict=True)
+
+            header = next(reader, None)
+
+            if header != EXPECTED_COLUMNS:
+
+                return {
+                    "exists": True,
+                    "total_rows": 0,
+                    "invalid_rows": [],
+                    "error": f"Unexpected CSV header: {header}"
+                }
+
+            total_rows = 1
+
+            for row_number, row in enumerate(reader, start=2):
+
+                total_rows += 1
+
+                if len(row) != len(EXPECTED_COLUMNS):
+
+                    invalid_rows.append({
+                        "row": row_number,
+                        "columns": len(row)
+                    })
+
+        return {
+            "exists": True,
+            "total_rows": total_rows,
+            "invalid_rows": invalid_rows,
+            "error": None
+        }
+
+    except (csv.Error, UnicodeDecodeError, OSError) as error:
+
+        return {
+            "exists": True,
+            "total_rows": total_rows,
+            "invalid_rows": invalid_rows,
+            "error": str(error)
+        }
+
+
+# Temporary diagnostics visible on dashboard.
+
+with st.expander("🔧 CSV Backend Diagnostics"):
+
+    diagnostics = inspect_csv()
+
+    st.write("CSV FILE PATH:", str(CSV_PATH))
+    st.write("CSV FILE EXISTS:", diagnostics["exists"])
+
+    if CSV_PATH.exists():
+
+        st.write(
+            "CSV FILE SIZE:",
+            CSV_PATH.stat().st_size,
+            "bytes"
+        )
+
+    st.write("TOTAL CSV ROWS:", diagnostics["total_rows"])
+    st.write("INVALID ROWS:", diagnostics["invalid_rows"])
+
+    if diagnostics["error"]:
+
+        st.error(diagnostics["error"])
+
+    elif diagnostics["invalid_rows"]:
+
+        st.warning("Malformed CSV records detected.")
+
+    else:
+
+        st.success("CSV structure validation completed.")
+
+
+# ==================================================
+# LOAD DATA
 # ==================================================
 
 @st.cache_data
@@ -226,73 +338,71 @@ def load_data(path, modified):
     file_path = Path(path)
 
     if not file_path.exists() or file_path.stat().st_size == 0:
+
         return pd.DataFrame(columns=EXPECTED_COLUMNS)
 
-    data = None
-    last_error = None
+    try:
 
-    # Try supported encodings and CSV parsing methods.
-    for encoding in ["utf-8-sig", "utf-8", "latin-1"]:
+        data = pd.read_csv(
+            file_path,
+            encoding="utf-8-sig",
+            dtype=str,
+            keep_default_na=False,
+            skipinitialspace=True,
+            on_bad_lines="error"
+        )
 
-        try:
-
-            data = pd.read_csv(
-                file_path,
-                encoding=encoding,
-                on_bad_lines="warn",
-                skipinitialspace=True
-            )
-
-            break
-
-        except (
-            pd.errors.ParserError,
-            UnicodeDecodeError,
-            pd.errors.EmptyDataError
-        ) as error:
-
-            last_error = error
-
-            # Try another encoding if reading fails.
-            continue
-
-    if data is None:
+    except (
+        pd.errors.ParserError,
+        UnicodeDecodeError,
+        pd.errors.EmptyDataError,
+        OSError
+    ) as error:
 
         st.error(
-            f"Unable to read news.csv: {last_error}"
+            f"Unable to read news.csv: {error}"
         )
 
         return pd.DataFrame(columns=EXPECTED_COLUMNS)
 
-    # Remove unnamed or unnecessary CSV columns.
+    # Remove unnamed columns.
+
     data = data.loc[
         :,
         ~data.columns.astype(str).str.startswith("Unnamed")
     ]
 
-    # Add missing expected columns.
+    # Add missing columns.
+
     for column in EXPECTED_COLUMNS:
 
         if column not in data.columns:
+
             data[column] = ""
 
-    # Keep only expected columns.
+    # Keep expected columns only.
+
     data = data[EXPECTED_COLUMNS].copy()
 
-    # Handle missing values.
-    data = data.fillna("")
+    # Clean data.
 
-    # Convert columns to strings.
     for column in EXPECTED_COLUMNS:
 
-        data[column] = data[column].astype(str).str.strip()
+        data[column] = (
+            data[column]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
 
-    # Remove completely empty headlines.
+    # Remove empty headlines.
+
     data = data[
         data["headline"].str.strip() != ""
     ]
 
-    # Remove duplicate headlines and links.
+    # Remove duplicates.
+
     data = data.drop_duplicates(
         subset=["link", "headline"],
         keep="last"
@@ -345,6 +455,7 @@ if st.button(
             with st.expander("View Feed Warnings"):
 
                 for error in result["errors"]:
+
                     st.warning(error)
 
         st.rerun()
